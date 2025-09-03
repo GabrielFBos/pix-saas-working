@@ -1,5 +1,9 @@
 # PIX SaaS Learning
 
+MVP para recebimento de pagamentos PIX com Next.js, TypeScript e Tailwind CSS.
+
+## 🚀 **NOVO REPOSITÓRIO LIMPO - FUNCIONANDO PERFEITAMENTE!**
+
 Sistema SaaS de aprendizado com integração PIX - MVP funcional completo.
 
 ## 🎯 Objetivo
@@ -344,3 +348,5 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 ---
 
 **PIX SaaS Learning** - Aprendendo integração PIX de forma prática! 🚀
+#   p i x - s a a s - w o r k i n g  
+ 
