@@ -24,10 +24,16 @@ const nextConfig = {
   // Desabilita compressão que pode causar problemas
   compress: false,
   
-  // Configuração webpack para ignorar warnings
+  // Configuração webpack para ignorar warnings e resolver aliases
   webpack: (config, { isServer }) => {
     // Ignora todos os warnings durante o build
     config.ignoreWarnings = [/.*/];
+    
+    // Configura aliases para resolver imports
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname, './'),
+    };
     
     // Filtra regras ESLint que podem causar problemas
     config.module.rules = config.module.rules.filter(rule => {
