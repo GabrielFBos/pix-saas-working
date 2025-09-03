@@ -1,0 +1,3 @@
+[33m4dad568[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix: corrigir ES Module syntax no next.config.mjs
+[33m48c2fba[m fix: corrigir alias @/ para componentes UI no Vercel
+[33m5a83aa8[m feat: configuração atualizada para novo Supabase
