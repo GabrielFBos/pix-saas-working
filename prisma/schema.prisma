@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo de usuário
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamento com pagamentos
+  payments Payment[]
+
+  @@map("users")
+}
+
+// Modelo de pagamento
+model Payment {
+  id           String   @id @default(cuid())
+  txid         String   @unique // ID único da transação PIX
+  amountCents  Int      // Valor em centavos
+  status       String   // Status: 'PENDING', 'PAID', 'FAILED'
+  provider     String   // Provedor PIX (ex: 'EFI', 'MP')
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relacionamento com usuário
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}

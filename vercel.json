@@ -1,0 +1,9 @@
+{
+  "name": "paycode-pix-saas",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ]
+}
