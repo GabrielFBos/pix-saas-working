@@ -29,10 +29,10 @@ const nextConfig = {
     // Ignora todos os warnings durante o build
     config.ignoreWarnings = [/.*/];
     
-    // Configura aliases para resolver imports
+    // Configura aliases para resolver imports usando ES Module syntax
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': require('path').resolve(__dirname, './'),
+      '@': new URL('./', import.meta.url).pathname,
     };
     
     // Filtra regras ESLint que podem causar problemas
