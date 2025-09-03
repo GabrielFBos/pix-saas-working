@@ -15,12 +15,47 @@ export async function POST(request: NextRequest) {
     // Verifica se o e-mail já existe
     const existingUser = await prisma.user.findUnique({
       where: { email: validatedData.email },
+      include: {
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
     });
 
     if (existingUser) {
+      // Se o usuário já existe, retorna o pagamento mais recente
+      if (existingUser.payments.length > 0) {
+        const latestPayment = existingUser.payments[0];
+        return NextResponse.json(
+          { 
+            txid: latestPayment.txid, 
+            message: 'Usuário já cadastrado, redirecionando para pagamento existente',
+            isExistingUser: true
+          },
+          { status: 200 }
+        );
+      }
+      
+      // Se não tem pagamentos, cria um novo
+      const txid = uuidv4();
+      const payment = await prisma.payment.create({
+        data: {
+          txid,
+          amountCents: env.PIX_FIXED_AMOUNT_CENTS,
+          status: 'PENDING',
+          provider: env.PIX_PROVIDER,
+          userId: existingUser.id,
+        },
+      });
+      
       return NextResponse.json(
-        { message: 'E-mail já cadastrado' },
-        { status: 409 }
+        { 
+          txid: payment.txid, 
+          message: 'Usuário já cadastrado, novo pagamento criado',
+          isExistingUser: true
+        },
+        { status: 200 }
       );
     }
 
@@ -60,7 +95,11 @@ export async function POST(request: NextRequest) {
     await pixGateway.createCharge(chargeData);
 
     // Retorna o TXID para redirecionamento
-    return NextResponse.json({ txid }, { status: 201 });
+    return NextResponse.json({ 
+      txid, 
+      message: 'Usuário criado com sucesso',
+      isExistingUser: false
+    }, { status: 201 });
   } catch (error) {
     console.error('Erro no pré-cadastro:', error);
 
