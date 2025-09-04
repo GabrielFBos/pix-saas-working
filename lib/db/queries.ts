@@ -18,18 +18,17 @@ export async function insertPayment(p: {
 }) {
   const { data, error } = await admin.from('payments').insert(p).select('txid').single();
   if (error) throw error;
-  return data.txid;
+  return data.txid as string;
 }
 
 export async function getPaymentStatus(txid: string) {
-  const { data, error } = await admin.from('payments')
-    .select('status').eq('txid', txid).single();
+  const { data, error } = await admin
+    .from('payments').select('status').eq('txid', txid).single();
   if (error) throw error;
   return data.status as 'pending' | 'paid' | 'failed' | 'expired';
 }
 
-export async function setPaymentStatus(txid: string, status: string) {
-  const { error } = await admin.from('payments')
-    .update({ status }).eq('txid', txid);
+export async function setPaymentStatus(txid: string, status: 'pending' | 'paid' | 'failed' | 'expired') {
+  const { error } = await admin.from('payments').update({ status }).eq('txid', txid);
   if (error) throw error;
 }

@@ -1,52 +1,25 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { setPaymentStatus } from '@/lib/db/queries';
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
+import { NextResponse } from 'next/server';
+import { getPaymentStatus, setPaymentStatus } from '@/lib/db/queries';
+
+export async function POST(req: Request) {
   try {
-    // Verificar header x-mock-secret
-    const mockSecret = request.headers.get('x-mock-secret');
-    const expectedSecret = process.env.MOCK_SECRET;
-
-    if (mockSecret !== expectedSecret) {
-      console.log('Webhook rejeitado: secret inválido');
-      return NextResponse.json(
-        { message: 'Secret inválido' },
-        { status: 401 }
-      );
+    const secret = req.headers.get('x-mock-secret');
+    if (secret !== process.env.MOCK_SECRET) {
+      return NextResponse.json({ ok: false }, { status: 401 });
     }
+    const { txid } = await req.json();
+    if (!txid) return NextResponse.json({ ok: false }, { status: 400 });
 
-    // Obter txid do body
-    const body = await request.json();
-    const { txid } = body;
-
-    if (!txid) {
-      return NextResponse.json(
-        { message: 'TXID é obrigatório' },
-        { status: 400 }
-      );
+    const current = await getPaymentStatus(txid);
+    if (current !== 'paid') {
+      await setPaymentStatus(txid, 'paid');
     }
-
-    // Atualizar status para 'paid' (idempotente)
-    await setPaymentStatus(txid, 'paid');
-
-    console.log(`Webhook processado: TXID ${txid} - Status: paid`);
-
-    // Retorna sucesso
-    return NextResponse.json({ 
-      success: true, 
-      txid,
-      status: 'paid'
-    }, { status: 200 });
-
-  } catch (error) {
-    console.error('Erro no webhook:', error);
-
-    return NextResponse.json(
-      { 
-        success: false, 
-        message: error instanceof Error ? error.message : 'Erro interno' 
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error('webhook 500:', err?.message ?? err);
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
