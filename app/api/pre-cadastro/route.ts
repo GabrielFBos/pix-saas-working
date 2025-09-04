@@ -1,105 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
-import { env } from '@/lib/env';
-import { getPixGateway } from '@/lib/pix';
-import { preCadastroSchema, createChargeSchema } from '@/lib/validation';
+import { upsertLeadByEmail, insertPayment } from '@/lib/db/queries';
+
+// Schema de validação simplificado
+const preCadastroSchema = z.object({
+  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
+  email: z.string().email('E-mail inválido'),
+});
 
 export async function POST(request: NextRequest) {
   try {
     // Parse e valida o body da requisição
     const body = await request.json();
-    const validatedData = preCadastroSchema.parse(body);
+    const { name, email } = preCadastroSchema.parse(body);
 
-    // Verifica se o e-mail já existe
-    const existingUser = await prisma.user.findUnique({
-      where: { email: validatedData.email },
-      include: {
-        payments: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-        },
-      },
-    });
+    // Upsert lead (cria ou retorna existente)
+    const leadId = await upsertLeadByEmail(name, email);
 
-    if (existingUser) {
-      // Se o usuário já existe, retorna o pagamento mais recente
-      if (existingUser.payments.length > 0) {
-        const latestPayment = existingUser.payments[0];
-        return NextResponse.json(
-          { 
-            txid: latestPayment.txid, 
-            message: 'Usuário já cadastrado, redirecionando para pagamento existente',
-            isExistingUser: true
-          },
-          { status: 200 }
-        );
-      }
-      
-      // Se não tem pagamentos, cria um novo
-      const txid = uuidv4();
-      const payment = await prisma.payment.create({
-        data: {
-          txid,
-          amountCents: env.PIX_FIXED_AMOUNT_CENTS,
-          status: 'PENDING',
-          provider: env.PIX_PROVIDER,
-          userId: existingUser.id,
-        },
-      });
-      
-      return NextResponse.json(
-        { 
-          txid: payment.txid, 
-          message: 'Usuário já cadastrado, novo pagamento criado',
-          isExistingUser: true
-        },
-        { status: 200 }
-      );
-    }
+    // Valor fixo do PIX
+    const amount = Number(process.env.PIX_FIXED_AMOUNT_CENTS ?? 990);
 
-    // Gera um TXID único
-    const txid = uuidv4();
+    // Gerar txid curto
+    const txid = uuidv4().substring(0, 8);
 
-    // Cria o usuário
-    const user = await prisma.user.create({
-      data: {
-        name: validatedData.name,
-        email: validatedData.email,
-      },
-    });
+    // Dados mock para PIX
+    const copy_paste = `00020126580014br.gov.bcb.pix0136${txid}520400005303986540${(amount / 100).toFixed(2)}5802BR5913MOCK PROVIDER6008BRASILIA62070503***6304${Math.random().toString().slice(2, 6)}`;
+    const qr_image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
-    // Cria o pagamento no banco
-    const _payment = await prisma.payment.create({
-      data: {
-        txid,
-        amountCents: env.PIX_FIXED_AMOUNT_CENTS,
-        status: 'PENDING',
-        provider: env.PIX_PROVIDER,
-        userId: user.id,
-      },
-    });
-
-    // Cria a cobrança PIX através do gateway
-    const pixGateway = getPixGateway();
-    const chargeData = createChargeSchema.parse({
-      amountCents: env.PIX_FIXED_AMOUNT_CENTS,
+    // Inserir pagamento no Supabase
+    await insertPayment({
+      lead_id: leadId,
+      amount_cents: amount,
+      method: 'pix',
       txid,
-      payer: {
-        name: validatedData.name,
-        email: validatedData.email,
-      },
+      copy_paste,
+      qr_image,
     });
 
-    await pixGateway.createCharge(chargeData);
-
-    // Retorna o TXID para redirecionamento
+    // Retorna sucesso
     return NextResponse.json({ 
-      txid, 
-      message: 'Usuário criado com sucesso',
-      isExistingUser: false
+      ok: true, 
+      txid,
+      message: 'Lead processado com sucesso'
     }, { status: 201 });
+
   } catch (error) {
     console.error('Erro no pré-cadastro:', error);
 

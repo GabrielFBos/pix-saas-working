@@ -1,39 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import { getPixGateway } from '@/lib/pix';
-import { statusQuerySchema } from '@/lib/validation';
+import { getPaymentStatus } from '@/lib/db/queries';
 
 export async function GET(request: NextRequest) {
   try {
-    // Obtém o TXID da query string
     const { searchParams } = new URL(request.url);
     const txid = searchParams.get('txid');
 
-    // Valida o TXID
-    const validatedData = statusQuerySchema.parse({ txid });
-
-    // Busca o status através do gateway PIX
-    const pixGateway = getPixGateway();
-    const status = await pixGateway.verifyPayment(validatedData.txid);
-
-    return NextResponse.json(status);
-  } catch (error) {
-    console.error('Erro ao consultar status:', error);
-
-    if (error instanceof z.ZodError) {
+    if (!txid) {
       return NextResponse.json(
-        { message: 'TXID inválido' },
+        { message: 'TXID é obrigatório' },
         { status: 400 }
       );
     }
 
-    if (error instanceof Error && error.message === 'Pagamento não encontrado') {
-      return NextResponse.json(
-        { message: 'Pagamento não encontrado' },
-        { status: 404 }
-      );
-    }
+    // Busca o status do pagamento no Supabase
+    const status = await getPaymentStatus(txid);
 
+    return NextResponse.json({
+      txid,
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Erro ao consultar status:', error);
     return NextResponse.json(
       { message: 'Erro interno do servidor' },
       { status: 500 }

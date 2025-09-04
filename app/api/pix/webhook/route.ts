@@ -1,26 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPixGateway } from '@/lib/pix';
+import { setPaymentStatus } from '@/lib/db/queries';
 
 export async function POST(request: NextRequest) {
   try {
-    // Processa o webhook através do gateway PIX
-    const pixGateway = getPixGateway();
-    const result = await pixGateway.handleWebhook(request);
+    // Verificar header x-mock-secret
+    const mockSecret = request.headers.get('x-mock-secret');
+    const expectedSecret = process.env.MOCK_SECRET;
 
-    console.log(`Webhook processado: TXID ${result.txid} - Status: ${result.status}`);
+    if (mockSecret !== expectedSecret) {
+      console.log('Webhook rejeitado: secret inválido');
+      return NextResponse.json(
+        { message: 'Secret inválido' },
+        { status: 401 }
+      );
+    }
 
-    // Retorna sucesso para o provedor PIX
-    return NextResponse.json({ success: true }, { status: 200 });
+    // Obter txid do body
+    const body = await request.json();
+    const { txid } = body;
+
+    if (!txid) {
+      return NextResponse.json(
+        { message: 'TXID é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Atualizar status para 'paid' (idempotente)
+    await setPaymentStatus(txid, 'paid');
+
+    console.log(`Webhook processado: TXID ${txid} - Status: paid`);
+
+    // Retorna sucesso
+    return NextResponse.json({ 
+      success: true, 
+      txid,
+      status: 'paid'
+    }, { status: 200 });
+
   } catch (error) {
     console.error('Erro no webhook:', error);
 
-    // Em caso de erro, retorna 400 para o provedor PIX tentar novamente
     return NextResponse.json(
       { 
         success: false, 
         message: error instanceof Error ? error.message : 'Erro interno' 
       },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }
